@@ -1,0 +1,529 @@
+{
+  "hosts": [
+    {
+      "ip": "10.10.1.10",
+      "zone": "WEB",
+      "env": "PROD",
+      "app": "CRM-WEB",
+      "tags": [],
+      "color": "#7fe6e6"
+    },
+    {
+      "ip": "10.10.1.11",
+      "zone": "WEB",
+      "env": "PROD",
+      "app": "CRM-WEB",
+      "tags": [],
+      "color": "#7fe6e6"
+    },
+    {
+      "ip": "10.10.1.12",
+      "zone": "WEB",
+      "env": "PROD",
+      "app": "CRM-WEB",
+      "tags": [],
+      "color": "#7fe6e6"
+    },
+    {
+      "ip": "10.20.1.10",
+      "zone": "APP",
+      "env": "PROD",
+      "app": "BIL01",
+      "tags": [],
+      "color": "#9fe08a"
+    },
+    {
+      "ip": "10.20.1.11",
+      "zone": "APP",
+      "env": "PROD",
+      "app": "BIL01",
+      "tags": [],
+      "color": "#9fe08a"
+    },
+    {
+      "ip": "10.20.1.12",
+      "zone": "APP",
+      "env": "PROD",
+      "app": "BIL01",
+      "tags": [],
+      "color": "#9fe08a"
+    },
+    {
+      "ip": "10.20.1.13",
+      "zone": "APP",
+      "env": "PROD",
+      "app": "BIL01",
+      "tags": [],
+      "color": "#9fe08a"
+    },
+    {
+      "ip": "10.30.1.10",
+      "zone": "DB",
+      "env": "PROD",
+      "app": "BIL01-DB",
+      "tags": [],
+      "color": "#3fae4a"
+    },
+    {
+      "ip": "10.30.1.11",
+      "zone": "DB",
+      "env": "PROD",
+      "app": "BIL01-DB",
+      "tags": [],
+      "color": "#3fae4a"
+    },
+    {
+      "ip": "10.30.9.10",
+      "zone": "DB",
+      "env": "PROD",
+      "app": "BIL01-DB-DR",
+      "tags": [
+        "DR"
+      ],
+      "color": "#3fae4a"
+    },
+    {
+      "ip": "10.40.1.10",
+      "zone": "APP",
+      "env": "PROD",
+      "app": "OPS-ADMIN",
+      "tags": [],
+      "color": "#9fe08a"
+    },
+    {
+      "ip": "10.50.1.10",
+      "zone": "DMZ",
+      "env": "PROD",
+      "app": "proxy",
+      "tags": [],
+      "color": "#7fe6e6"
+    },
+    {
+      "ip": "10.99.0.5",
+      "zone": "MGMT",
+      "env": "PROD",
+      "app": "FW-MGMT",
+      "tags": [
+        "MGMT"
+      ],
+      "color": "#c9c9c9"
+    },
+    {
+      "ip": "172.16.1.10",
+      "zone": "APP",
+      "env": "TEST",
+      "app": "BIL01-T",
+      "tags": [],
+      "color": "#9fe08a"
+    },
+    {
+      "ip": "172.16.1.11",
+      "zone": "APP",
+      "env": "TEST",
+      "app": "BIL01-T",
+      "tags": [],
+      "color": "#9fe08a"
+    },
+    {
+      "ip": "172.16.2.10",
+      "zone": "WEB",
+      "env": "TEST",
+      "app": "CRM-WEB-T",
+      "tags": [],
+      "color": "#7fe6e6"
+    },
+    {
+      "ip": "203.0.113.5",
+      "zone": "INTERNET",
+      "env": "EXT",
+      "app": "partner",
+      "tags": [],
+      "color": "#ffffff"
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "R090",
+      "order": 5,
+      "action": "DENY",
+      "source": "g-QUARANTINE",
+      "source_zone": "",
+      "destination": "any",
+      "destination_zone": "",
+      "service": "any",
+      "tags": [],
+      "schedule": "",
+      "expires": "",
+      "firewall": "fwb-ahm1",
+      "comment": "#100090 synthetic"
+    },
+    {
+      "rule_id": "R100",
+      "order": 10,
+      "action": "ALLOW",
+      "source": "10.20.1.0/24",
+      "source_zone": "",
+      "destination": "10.30.1.0/24",
+      "destination_zone": "",
+      "service": "tcp/1521",
+      "tags": [],
+      "schedule": "",
+      "expires": "",
+      "firewall": "fwb-ber2",
+      "comment": "#100100 synthetic"
+    },
+    {
+      "rule_id": "R110",
+      "order": 20,
+      "action": "ALLOW",
+      "source": "10.20.1.0/24",
+      "source_zone": "",
+      "destination": "10.30.9.10",
+      "destination_zone": "DB",
+      "service": "tcp/1521",
+      "tags": [
+        "DR"
+      ],
+      "schedule": "",
+      "expires": "",
+      "firewall": "fwf-ahr6",
+      "comment": "#100110 synthetic"
+    },
+    {
+      "rule_id": "R120",
+      "order": 30,
+      "action": "ALLOW",
+      "source": "10.10.1.0/24",
+      "source_zone": "",
+      "destination": "10.20.1.0/24",
+      "destination_zone": "",
+      "service": "tcp/8443",
+      "tags": [],
+      "schedule": "",
+      "expires": "",
+      "firewall": "fwf-ber6",
+      "comment": "#100120 synthetic"
+    },
+    {
+      "rule_id": "R140",
+      "order": 50,
+      "action": "ALLOW",
+      "source": "172.16.2.0/24",
+      "source_zone": "",
+      "destination": "172.16.1.0/24",
+      "destination_zone": "",
+      "service": "tcp/8080",
+      "tags": [],
+      "schedule": "",
+      "expires": "",
+      "firewall": "fwhid1",
+      "comment": "#100140 synthetic"
+    },
+    {
+      "rule_id": "R150",
+      "order": 60,
+      "action": "ALLOW",
+      "source": "172.16.1.10",
+      "source_zone": "APP",
+      "destination": "172.16.2.10",
+      "destination_zone": "WEB",
+      "service": "tcp/22",
+      "tags": [],
+      "schedule": "",
+      "expires": "",
+      "firewall": "fwoff1",
+      "comment": "#100150 synthetic"
+    },
+    {
+      "rule_id": "R160",
+      "order": 70,
+      "action": "ALLOW",
+      "source": "10.20.1.10",
+      "source_zone": "APP",
+      "destination": "10.30.1.10",
+      "destination_zone": "DB",
+      "service": "tcp/1521",
+      "tags": [],
+      "schedule": "",
+      "expires": "",
+      "firewall": "fwb-ahm1",
+      "comment": "#100160 synthetic"
+    },
+    {
+      "rule_id": "R170",
+      "order": 80,
+      "action": "DENY",
+      "source": "172.16.2.0/24",
+      "source_zone": "",
+      "destination": "172.16.1.11",
+      "destination_zone": "APP",
+      "service": "tcp/9000",
+      "tags": [],
+      "schedule": "",
+      "expires": "",
+      "firewall": "fwb-ber2",
+      "comment": "#100170 synthetic"
+    },
+    {
+      "rule_id": "R180",
+      "order": 90,
+      "action": "ALLOW",
+      "source": "10.40.1.10",
+      "source_zone": "APP",
+      "destination": "10.99.0.5",
+      "destination_zone": "MGMT",
+      "service": "tcp/443",
+      "tags": [],
+      "schedule": "",
+      "expires": "",
+      "firewall": "fwf-ahr6",
+      "comment": "#100180 synthetic"
+    }
+  ],
+  "objectgroups": [
+    {
+      "name": "g-QUARANTINE",
+      "members": [],
+      "comment": "auto-quarantine placeholder group"
+    },
+    {
+      "name": "G-BIL01-PROD-APP",
+      "members": [
+        "10.20.1.10",
+        "10.20.1.11",
+        "10.20.1.12",
+        "10.20.1.13"
+      ],
+      "comment": "#100501 billing app tier, PROD"
+    },
+    {
+      "name": "G-BIL01-PROD-DB",
+      "members": [
+        "10.30.1.10",
+        "10.30.1.11",
+        "10.30.9.10"
+      ],
+      "comment": "#100502 billing DB tier incl. DR"
+    },
+    {
+      "name": "G-CRM-WEB",
+      "members": [
+        "10.10.1.10",
+        "10.10.1.11",
+        "10.10.1.12",
+        "172.16.2.10"
+      ],
+      "comment": "#100503 CRM web tier, all envs"
+    }
+  ],
+  "firewalls": {
+    "DC": [
+      {
+        "id": "fwb-ahm1",
+        "rules": 42,
+        "zones": [
+          "MGMT",
+          "DMZ",
+          "APP",
+          "DB"
+        ]
+      },
+      {
+        "id": "fwb-ber2",
+        "rules": 31,
+        "zones": [
+          "MGMT",
+          "APP"
+        ]
+      },
+      {
+        "id": "fwf-ahr6",
+        "rules": 18,
+        "zones": [
+          "MGMT",
+          "WEB"
+        ]
+      },
+      {
+        "id": "fwf-ber6",
+        "rules": 27,
+        "zones": [
+          "MGMT",
+          "DMZ"
+        ]
+      },
+      {
+        "id": "fwhid1",
+        "rules": 9,
+        "zones": [
+          "MGMT"
+        ]
+      },
+      {
+        "id": "fwoff1",
+        "rules": 15,
+        "zones": [
+          "MGMT",
+          "APP"
+        ]
+      }
+    ],
+    "OLD": [
+      {
+        "id": "fwber51",
+        "rules": 6,
+        "zones": [
+          "MGMT"
+        ]
+      },
+      {
+        "id": "fwdus1",
+        "rules": 4,
+        "zones": [
+          "MGMT"
+        ]
+      }
+    ],
+    "Cloud": [
+      {
+        "id": "fwaws1",
+        "rules": 22,
+        "zones": [
+          "MGMT",
+          "APP",
+          "DB"
+        ]
+      },
+      {
+        "id": "fwaws2",
+        "rules": 19,
+        "zones": [
+          "MGMT",
+          "APP"
+        ]
+      },
+      {
+        "id": "fwgcp1",
+        "rules": 14,
+        "zones": [
+          "MGMT",
+          "DMZ"
+        ]
+      }
+    ]
+  },
+  "interfaces": {
+    "fwb-ahm1": [
+      {
+        "iface": "Mgmt",
+        "subnet": "10.99.0.0/24",
+        "zone": "MGMT",
+        "description": "DCN-MGMT-01",
+        "responsible": "n.schmidt@btnl-demo.local",
+        "comment": "#100010"
+      },
+      {
+        "iface": "bond1.410",
+        "subnet": "10.50.1.0/24",
+        "zone": "DMZ",
+        "description": "DCN-DMZ-01",
+        "responsible": "r.sharma@btnl-demo.local",
+        "comment": "#100011"
+      },
+      {
+        "iface": "bond1.797",
+        "subnet": "10.20.1.0/24",
+        "zone": "APP",
+        "description": "DCN-APP-01",
+        "responsible": "r.sharma@btnl-demo.local",
+        "comment": "#100012"
+      },
+      {
+        "iface": "bond1.780",
+        "subnet": "10.30.1.0/24",
+        "zone": "DB",
+        "description": "DCN-DB-01",
+        "responsible": "m.weber@btnl-demo.local",
+        "comment": "#100013"
+      }
+    ]
+  },
+  "routing": {
+    "fwb-ahm1": [
+      {
+        "destination": "10.20.1.0/24",
+        "gateway": "direct",
+        "interface": "bond1.797"
+      },
+      {
+        "destination": "10.30.1.0/24",
+        "gateway": "direct",
+        "interface": "bond1.780"
+      },
+      {
+        "destination": "10.99.0.0/24",
+        "gateway": "direct",
+        "interface": "mgmt0"
+      },
+      {
+        "destination": "0.0.0.0/0",
+        "gateway": "10.50.1.1",
+        "interface": "bond1.410"
+      }
+    ]
+  },
+  "zone_wizard": {
+    "start": "q_external",
+    "nodes": {
+      "q_external": {
+        "q": "Does the system have connections to external systems?",
+        "yes": "q_unknown_target",
+        "no": "q_workstation_or_server"
+      },
+      "q_unknown_target": {
+        "q": "Are there connections from or to unknown target systems?",
+        "yes": {
+          "result": "Zone A",
+          "note": "Unknown external peers \u2014 highest scrutiny."
+        },
+        "no": "q_sensitive_data"
+      },
+      "q_sensitive_data": {
+        "q": "Is sensitive data accessed?",
+        "yes": {
+          "result": "Zone B",
+          "note": "e.g. proxy system / ALG, sensitive data in flight."
+        },
+        "no": {
+          "result": "Zone B2",
+          "note": "e.g. proxy system / ALG \u2014 no backend storage required."
+        }
+      },
+      "q_workstation_or_server": {
+        "q": "Is the system an office system (workstation) or a server?",
+        "workstation": {
+          "result": "Zone C",
+          "note": "Office workstation, no external exposure."
+        },
+        "server": "q_data_used"
+      },
+      "q_data_used": {
+        "q": "What is the system used for or which data is processed?",
+        "prod": {
+          "result": "Zone A2",
+          "note": "Production server, internal only."
+        },
+        "test": {
+          "result": "Zone C",
+          "note": "Test system \u2014 productive data may not be used."
+        },
+        "dev": {
+          "result": "Zone C",
+          "note": "Dev system \u2014 productive data may not be used."
+        }
+      }
+    }
+  },
+  "search_grammar": "expression = term { ['or' | '|'] term }\nterm       = factor { ['and' | '&' | space] factor }\nfactor     = [ '!' ] obj | '(' expression ')'\nobj        = [ spec ':' ] NAME\nspec       = 'src' | 'dst' | 'serv' | 'action' | 'fw'\nname       = [a-zA-Z][:alnum:]*",
+  "source_note": "Host/rule/zone data exported from test_sentrywall_core.estate() \u2014 the exact fixture the 272-test suite runs against. Firewall device names/interfaces are synthetic UI dressing."
+}

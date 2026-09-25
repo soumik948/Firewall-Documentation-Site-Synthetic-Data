@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Firewall Documentation System (Synthetic Demo)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="logo.svg" alt=""> Firewall Documentation System — Synthetic Demo v1.0</div>
+  <div class="session">Logged in as DEMO-USER-01 (Synthetic) · <a href="login.html" style="color:#fff;">Logout</a></div>
+</header>
+<nav class="tabs">
+  <a href="index.html" class="active">Home</a>
+  <a href="zone-app.html">Zone App</a>
+  <a href="request-checker.html">Request Checker</a>
+  <a href="firewalls.html">Firewalls</a>
+  <a href="search.html">Search</a>
+</nav>
+
+<main>
+  <h1>Firewall Documentation System — Synthetic Demo</h1>
+
+  <div class="info-box">
+    This is a look-alike clone of the internal Firewall Documentation System, rebuilt with 100%
+    synthetic data for the Sentrywall proof-of-concept. It mirrors the navigation and feature set —
+    <b>Firewalls</b>, <b>Zone App</b> (system classification wizard), <b>Search</b> (query grammar) —
+    of the real portal shown in the source screenshots.
+  </div>
+
+  <h2>What's in this demo</h2>
+  <table>
+    <tr><th>Section</th><th>What it shows</th></tr>
+    <tr><td><a href="firewalls.html">Firewalls</a></td>
+        <td>Synthetic firewall inventory grouped like the real portal (DC / OLD / Cloud), each with
+        interfaces &amp; zones, object groups, routing table and access rules.</td></tr>
+    <tr><td><a href="zone-app.html">Zone App</a></td>
+        <td>The same Yes/No classification wizard for a new system or service, ending in a Zone
+        verdict (A / A2 / B / B2 / C).</td></tr>
+    <tr><td><a href="search.html">Search</a></td>
+        <td>The same query grammar (<code>src:</code> / <code>dst:</code> / <code>serv:</code> /
+        <code>action:</code> / <code>fw:</code>) over the synthetic host/rule/group dataset.</td></tr>
+    <tr><td><a href="request-checker.html">Request Checker</a></td>
+        <td>Points to the actual Sentrywall agent app — this documentation clone does not run
+        analysis itself.</td></tr>
+  </table>
+
+  <p class="footnote" id="source-note">Loading data source note…</p>
+</main>
+
+<script>
+fetch('data.json').then(r => r.json()).then(d => {
+  document.getElementById('source-note').textContent = d.source_note;
+});
+</script>
+</body>
+</html>

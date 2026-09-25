@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Zone App — Synthetic Demo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="logo.svg" alt=""> Firewall Documentation System — Synthetic Demo v1.0</div>
+  <div class="session">Logged in as DEMO-USER-01 (Synthetic)</div>
+</header>
+<nav class="tabs">
+  <a href="index.html">Home</a>
+  <a href="zone-app.html" class="active">Zone App</a>
+  <a href="request-checker.html">Request Checker</a>
+  <a href="firewalls.html">Firewalls</a>
+  <a href="search.html">Search</a>
+</nav>
+
+<main style="max-width:620px;">
+  <h1>Analysis of an existing system or new service</h1>
+  <div id="trail" class="wizard-trail"></div>
+  <div id="question"></div>
+
+  <div style="margin-top:16px;">
+    <button id="back">Back</button>
+    <button id="restart">Restart</button>
+  </div>
+
+  <div class="info-box" style="margin-top:26px;">
+    <b>Info</b><br>
+    This wizard classifies a new or existing system into a security zone before any firewall rule
+    is requested for it — same question flow as the real portal, synthetic data only.
+  </div>
+</main>
+
+<script>
+let tree, node, path = [];
+
+fetch('data.json').then(r => r.json()).then(d => {
+  tree = d.zone_wizard;
+  node = tree.start;
+  render();
+});
+
+function render() {
+  const trail = document.getElementById('trail');
+  trail.innerHTML = path.map(p => `${p.q}<br>&nbsp;&nbsp;→ <b>${p.a}</b><br>`).join('');
+
+  const box = document.getElementById('question');
+  const entry = tree.nodes[node];
+  if (!entry) { box.innerHTML = terminal({result:'—', note:'dead end'}); return; }
+
+  if (entry.result !== undefined) {
+    box.innerHTML = terminal(entry);
+    return;
+  }
+
+  box.innerHTML = `<div class="wizard-q">${entry.q}</div>`;
+  const btnRow = document.createElement('div');
+  Object.keys(entry).filter(k => k !== 'q').forEach(key => {
+    const b = document.createElement('button');
+    b.className = 'primary';
+    b.style.marginRight = '8px';
+    b.textContent = label(key);
+    b.onclick = () => choose(entry, key);
+    btnRow.appendChild(b);
+  });
+  box.appendChild(btnRow);
+}
+
+function label(key) {
+  return {yes:'Yes', no:'No', workstation:'Workstation', server:'Server',
+          prod:'Prod', test:'Test', dev:'Dev'}[key] || key;
+}
+
+function choose(entry, key) {
+  path.push({q: entry.q, a: label(key)});
+  const next = entry[key];
+  node = (typeof next === 'string') ? next : registerTerminal(next);
+  render();
+}
+
+let termCounter = 0;
+function registerTerminal(obj) {
+  const id = '__term' + (termCounter++);
+  tree.nodes[id] = obj;
+  return id;
+}
+
+function terminal(entry) {
+  const cls = entry.result && entry.result.startsWith('Zone A') ? 'warn' : 'ok';
+  return `<div class="info-box ${cls}"><b>${entry.result}</b> — ${entry.note}</div>
+          <p class="muted">This verdict is a system classification, independent of the enforcement
+          zone (WEB/APP/DB/MGMT) a firewall rule change is later checked against.</p>`;
+}
+
+document.getElementById('back').onclick = () => {
+  if (path.length) { path.pop(); node = tree.start;
+    // replay remaining path to recompute node
+    let cur = tree.start, trail = [...path]; path = [];
+    trail.forEach(step => {
+      const entry = tree.nodes[cur];
+      const key = Object.keys(entry).find(k => label(k) === step.a);
+      const next = entry[key];
+      path.push(step);
+      cur = (typeof next === 'string') ? next : registerTerminal(next);
+    });
+    node = cur;
+  }
+  render();
+};
+
+document.getElementById('restart').onclick = () => { path = []; node = tree.start; render(); };
+</script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Firewall Detail — Synthetic Demo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="logo.svg" alt=""> Firewall Documentation System — Synthetic Demo v1.0</div>
+  <div class="session">Logged in as DEMO-USER-01 (Synthetic)</div>
+</header>
+<nav class="tabs">
+  <a href="index.html">Home</a>
+  <a href="zone-app.html">Zone App</a>
+  <a href="request-checker.html">Request Checker</a>
+  <a href="firewalls.html" class="active">Firewalls</a>
+  <a href="search.html">Search</a>
+</nav>
+
+<main>
+  <h1 id="title">Firewall</h1>
+  <nav class="tabs" style="background:#e9edf2; margin-bottom:14px;">
+    <a href="#" data-tab="iface" style="color:#1653a6;">Interfaces &amp; Zones</a>
+    <a href="#" data-tab="groups" style="color:#1653a6;">Objectgroups</a>
+    <a href="#" data-tab="routing" style="color:#1653a6;">Routing Table</a>
+    <a href="#" data-tab="rules" style="color:#1653a6;">Access Rules</a>
+  </nav>
+  <div id="panel"></div>
+</main>
+
+<script>
+const params = new URLSearchParams(location.search);
+const fwId = params.get('id') || 'fwb-ahm1';
+let activeTab = params.get('tab') || 'iface';
+document.getElementById('title').textContent = fwId + ': ' + labelFor(activeTab);
+
+function labelFor(t) {
+  return {iface:'Interfaces and Zones', groups:'Objectgroups', routing:'Routing Table', rules:'Access Rules'}[t] || t;
+}
+
+fetch('data.json').then(r => r.json()).then(d => { window.__data = d; render(); });
+
+document.querySelectorAll('[data-tab]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    activeTab = a.dataset.tab;
+    document.getElementById('title').textContent = fwId + ': ' + labelFor(activeTab);
+    render();
+  });
+});
+
+function zoneChip(z) {
+  const m = {MGMT:'#c9c9c9', DMZ:'#7fe6e6', WEB:'#7fe6e6', APP:'#9fe08a', DB:'#3fae4a', CORE:'#3fae4a'};
+  return z ? `<span class="zone-chip" style="background:${m[z]||'#eee'}">${z}</span>` : '';
+}
+
+function render() {
+  const d = window.__data;
+  const panel = document.getElementById('panel');
+  if (activeTab === 'iface') {
+    const rows = (d.interfaces[fwId] || []);
+    panel.innerHTML = table(
+      ['Interface','Subnet','Netzone','Description','Responsible','Comment'],
+      rows.length ? rows.map(r => [r.iface, r.subnet, zoneChip(r.zone), r.description, r.responsible, r.comment])
+                  : [['—','no interfaces recorded for this synthetic device — showing example device only','','','','']]
+    );
+  } else if (activeTab === 'groups') {
+    panel.innerHTML = table(
+      ['Name','Members','Comment'],
+      d.objectgroups.map(g => [g.name, g.members.join('<br>') || '<i>empty</i>', g.comment])
+    );
+  } else if (activeTab === 'routing') {
+    const rows = (d.routing[fwId] || []);
+    panel.innerHTML = table(
+      ['Destination','Gateway','Interface'],
+      rows.length ? rows.map(r => [r.destination, r.gateway, r.interface])
+                  : [['—','no routing entries recorded for this synthetic device','']]
+    );
+  } else if (activeTab === 'rules') {
+    panel.innerHTML = table(
+      ['Rulename','Action','Source zone','Source','Destination zone','Destination','Service','Comment'],
+      d.rules.map(r => [r.rule_id, flagAction(r.action), zoneChip(r.source_zone), r.source,
+                         zoneChip(r.destination_zone), r.destination, r.service, r.comment])
+    );
+  }
+}
+
+function flagAction(a) {
+  return a === 'DENY' ? '<span class="flag-red">DENY</span>' : '<span class="flag-green">ALLOW</span>';
+}
+
+function table(headers, rows) {
+  let h = '<div class="card"><table><tr>' + headers.map(x => `<th>${x}</th>`).join('') + '</tr>';
+  rows.forEach(r => { h += '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>'; });
+  h += '</table></div>';
+  return h;
+}
+</script>
+</body>
+</html>

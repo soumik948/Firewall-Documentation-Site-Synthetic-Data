@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Search — Synthetic Demo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><img src="logo.svg" alt=""> Firewall Documentation System — Synthetic Demo v1.0</div>
+  <div class="session">Logged in as DEMO-USER-01 (Synthetic)</div>
+</header>
+<nav class="tabs">
+  <a href="index.html">Home</a>
+  <a href="zone-app.html">Zone App</a>
+  <a href="request-checker.html">Request Checker</a>
+  <a href="firewalls.html">Firewalls</a>
+  <a href="search.html" class="active">Search</a>
+</nav>
+
+<main>
+  <h1>Search</h1>
+  <pre id="grammar" class="muted" style="background:#fff;border:1px solid var(--border);padding:10px;"></pre>
+
+  <input type="text" id="q" placeholder="e.g. src:10.20.1.10 or dst:10.30.1.10 and serv:1521">
+  <button class="primary" id="go">Go!</button>
+  <div id="results"></div>
+</main>
+
+<script>
+let data;
+fetch('data.json').then(r => r.json()).then(d => {
+  data = d;
+  document.getElementById('grammar').textContent = d.search_grammar;
+  buildIndex();
+});
+
+let index = [];
+function buildIndex() {
+  data.hosts.forEach(h => index.push({
+    kind: 'Host', name: h.ip, src: h.ip, dst: h.ip, serv: '', action: '', fw: '',
+    text: `${h.ip} ${h.app} ${h.zone} ${h.env}`.toLowerCase(),
+    detail: `${h.app} · zone ${h.zone} · env ${h.env}`
+  }));
+  data.rules.forEach(r => index.push({
+    kind: 'Rule', name: r.rule_id, src: r.source, dst: r.destination, serv: r.service,
+    action: r.action, fw: r.firewall,
+    text: `${r.rule_id} ${r.source} ${r.destination} ${r.service} ${r.action} ${r.firewall} ${r.comment}`.toLowerCase(),
+    detail: `${r.action} ${r.source} → ${r.destination} (${r.service}) on ${r.firewall}`
+  }));
+  data.objectgroups.forEach(g => index.push({
+    kind: 'Group', name: g.name, src: g.members.join(' '), dst: g.members.join(' '),
+    serv: '', action: '', fw: '',
+    text: `${g.name} ${g.members.join(' ')} ${g.comment}`.toLowerCase(),
+    detail: `${g.members.length} member(s) — ${g.comment}`
+  }));
+}
+
+document.getElementById('go').onclick = runSearch;
+document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+
+function runSearch() {
+  const raw = document.getElementById('q').value.trim();
+  const out = document.getElementById('results');
+  if (!raw) { out.innerHTML = ''; return; }
+  let matches;
+  try {
+    matches = evalExpr(parse(tokenize(raw)));
+  } catch (e) {
+    out.innerHTML = `<div class="info-box warn">Could not parse query: ${e.message}</div>`;
+    return;
+  }
+  if (!matches.length) { out.innerHTML = '<p class="muted">No matches.</p>'; return; }
+  let h = '<div class="card"><div class="card-head">Results (' + matches.length + ')</div><table>' +
+          '<tr><th>Type</th><th>Name</th><th>Detail</th></tr>';
+  matches.forEach(m => { h += `<tr><td>${m.kind}</td><td>${m.name}</td><td>${m.detail}</td></tr>`; });
+  h += '</table></div>';
+  out.innerHTML = h;
+}
+
+// ── tiny recursive-descent parser for: expression = term {('or'|'|') term}
+//    term = factor {('and'|'&'|space) factor} ; factor = ['!'] obj | '(' expr ')'
+//    obj = [spec ':'] NAME ; spec = src|dst|serv|action|fw
+function tokenize(s) {
+  return s.match(/\(|\)|\||!|\band\b|\bor\b|&|[^\s()|!&]+/gi) || [];
+}
+function parse(tokens) {
+  let i = 0;
+  function peek() { return tokens[i]; }
+  function next() { return tokens[i++]; }
+  function parseExpr() {
+    let node = parseTerm();
+    while (peek() && /^(or|\|)$/i.test(peek())) { next(); node = {op: 'or', a: node, b: parseTerm()}; }
+    return node;
+  }
+  function parseTerm() {
+    let node = parseFactor();
+    while (peek() && !/^(or|\||\))$/i.test(peek())) {
+      if (/^(and|&)$/i.test(peek())) next();
+      node = {op: 'and', a: node, b: parseFactor()};
+    }
+    return node;
+  }
+  function parseFactor() {
+    if (peek() === '!') { next(); return {op: 'not', a: parseFactor()}; }
+    if (peek() === '(') { next(); const n = parseExpr();
+      if (peek() !== ')') throw new Error('missing )'); next(); return n; }
+    const tok = next();
+    if (tok === undefined) throw new Error('unexpected end of query');
+    const m = tok.match(/^(src|dst|serv|action|fw):(.+)$/i);
+    if (m) return {op: 'obj', spec: m[1].toLowerCase(), val: m[2].toLowerCase()};
+    return {op: 'obj', spec: null, val: tok.toLowerCase()};
+  }
+  return parseExpr();
+}
+function evalExpr(node) {
+  if (node.op === 'obj') {
+    return index.filter(o => node.spec
+      ? String(o[node.spec] || '').toLowerCase().includes(node.val)
+      : o.text.includes(node.val));
+  }
+  if (node.op === 'and') { const a = evalExpr(node.a), b = new Set(evalExpr(node.b).map(x=>x.name+x.kind));
+    return a.filter(x => b.has(x.name+x.kind)); }
+  if (node.op === 'or') { const a = evalExpr(node.a), b = evalExpr(node.b);
+    const seen = new Set(); const out = [];
+    [...a, ...b].forEach(x => { const k = x.name+x.kind; if (!seen.has(k)) { seen.add(k); out.push(x); } });
+    return out; }
+  if (node.op === 'not') { const ex = new Set(evalExpr(node.a).map(x=>x.name+x.kind));
+    return index.filter(x => !ex.has(x.name+x.kind)); }
+  return [];
+}
+</script>
+</body>
+</html>
