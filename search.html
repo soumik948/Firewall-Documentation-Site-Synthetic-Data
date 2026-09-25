@@ -21,40 +21,22 @@
 <main>
   <h1>Search</h1>
   <pre id="grammar" class="muted" style="background:#fff;border:1px solid var(--border);padding:10px;"></pre>
+  <p class="muted">A bare IPv4 address (e.g. <code>10.20.180.2</code>) gets the full lookup below —
+  exact host, containing network (even with no exact host record), bigger networks, group
+  membership, routes and access rules. Anything else uses the query grammar above.</p>
 
-  <input type="text" id="q" placeholder="e.g. src:10.20.1.10 or dst:10.30.1.10 and serv:1521">
+  <input type="text" id="q" placeholder="e.g. 10.20.180.2   or   src:10.20.1.10 and serv:1521">
   <button class="primary" id="go">Go!</button>
   <div id="results"></div>
 </main>
 
+<script src="common.js"></script>
 <script>
 let data;
 fetch('data.json').then(r => r.json()).then(d => {
   data = d;
   document.getElementById('grammar').textContent = d.search_grammar;
-  buildIndex();
 });
-
-let index = [];
-function buildIndex() {
-  data.hosts.forEach(h => index.push({
-    kind: 'Host', name: h.ip, src: h.ip, dst: h.ip, serv: '', action: '', fw: '',
-    text: `${h.ip} ${h.app} ${h.zone} ${h.env}`.toLowerCase(),
-    detail: `${h.app} · zone ${h.zone} · env ${h.env}`
-  }));
-  data.rules.forEach(r => index.push({
-    kind: 'Rule', name: r.rule_id, src: r.source, dst: r.destination, serv: r.service,
-    action: r.action, fw: r.firewall,
-    text: `${r.rule_id} ${r.source} ${r.destination} ${r.service} ${r.action} ${r.firewall} ${r.comment}`.toLowerCase(),
-    detail: `${r.action} ${r.source} → ${r.destination} (${r.service}) on ${r.firewall}`
-  }));
-  data.objectgroups.forEach(g => index.push({
-    kind: 'Group', name: g.name, src: g.members.join(' '), dst: g.members.join(' '),
-    serv: '', action: '', fw: '',
-    text: `${g.name} ${g.members.join(' ')} ${g.comment}`.toLowerCase(),
-    detail: `${g.members.length} member(s) — ${g.comment}`
-  }));
-}
 
 document.getElementById('go').onclick = runSearch;
 document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
@@ -63,70 +45,185 @@ function runSearch() {
   const raw = document.getElementById('q').value.trim();
   const out = document.getElementById('results');
   if (!raw) { out.innerHTML = ''; return; }
-  let matches;
-  try {
-    matches = evalExpr(parse(tokenize(raw)));
-  } catch (e) {
-    out.innerHTML = `<div class="info-box warn">Could not parse query: ${e.message}</div>`;
-    return;
-  }
-  if (!matches.length) { out.innerHTML = '<p class="muted">No matches.</p>'; return; }
-  let h = '<div class="card"><div class="card-head">Results (' + matches.length + ')</div><table>' +
-          '<tr><th>Type</th><th>Name</th><th>Detail</th></tr>';
-  matches.forEach(m => { h += `<tr><td>${m.kind}</td><td>${m.name}</td><td>${m.detail}</td></tr>`; });
-  h += '</table></div>';
-  out.innerHTML = h;
+  out.innerHTML = isValidIPv4(raw) ? renderIpLookup(raw) : renderGrammarSearch(raw);
 }
 
-// ── tiny recursive-descent parser for: expression = term {('or'|'|') term}
-//    term = factor {('and'|'&'|space) factor} ; factor = ['!'] obj | '(' expr ')'
-//    obj = [spec ':'] NAME ; spec = src|dst|serv|action|fw
-function tokenize(s) {
-  return s.match(/\(|\)|\||!|\band\b|\bor\b|&|[^\s()|!&]+/gi) || [];
+// ── rich per-IP lookup (mirrors the real portal's IP search) ───────────
+function renderIpLookup(ip) {
+  const nets = findContainingNetworks(data, ip);
+  const exactHosts = allHosts(data).filter(h => h.ip === ip);
+  let h = `<h2>Found: IPv4 Address ${ip}</h2>`;
+
+  if (!nets.length) {
+    h += `<div class="info-box warn">The Security-Zone could not be determined — this address
+          doesn't fall inside any documented network range.</div>`;
+    return h;
+  }
+
+  const primary = nets[0];   // most specific (largest prefix)
+  const bigger = nets.slice(1);
+  h += `<div class="info-box">
+          <b>Security-Zone:</b> ${zoneChip(primary.zone)} ${tierBadge(primary.tier)}<br>
+          <b>Network</b> ${primary.cidr} '${primary.name}'
+          ${primary.firewall ? ` behind firewall <a href="firewall-detail.html?id=${primary.firewall}">${primary.firewall}</a>` : ''}
+          ${primary.interface ? `<br><b>Interface</b> ${primary.interface}` : ''}
+          ${primary.comment ? `, comment: ${primary.comment}` : ''}
+        </div>`;
+
+  h += '<h2>Hosts</h2>';
+  h += exactHosts.length
+    ? table(['Firewall', 'Name', 'IP', 'Comment', ''],
+        exactHosts.map(hh => [primary.firewall || '—', hh.name || '—', hh.ip, hh.comment || '', tierBadge(hh.tier)]))
+    : '<p class="muted">No exact host record at this address — it\'s covered by the network above, but no individual host is separately named.</p>';
+
+  h += '<h2>Bigger networks</h2>';
+  h += bigger.length
+    ? table(['Name', 'Networks', ''], bigger.map(n => [n.name, n.cidr, tierBadge(n.tier)]))
+    : '<p class="muted">No networks were found in which the object is contained.</p>';
+
+  h += '<h2>Group membership</h2>';
+  const grps = groupsContaining(data, ip);
+  h += grps.length
+    ? table(['Group', 'Comment'], grps.map(g => [g.name, g.comment || '']))
+    : '<p class="muted">No groups were found in which the object is contained.</p>';
+
+  h += '<h2>Routes</h2>';
+  const routeRows = [];
+  for (const routingKey of ['routing', 'big_routing']) {
+    const routingObj = data[routingKey] || {};
+    for (const [fwId, routes] of Object.entries(routingObj)) {
+      (routes || []).forEach(rt => {
+        if (rt.destination.includes('/') && cidrContainsIp(rt.destination, ip2int(ip))) {
+          routeRows.push([fwId, rt.destination, rt.gateway, rt.interface]);
+        }
+      });
+    }
+  }
+  h += routeRows.length
+    ? table(['Firewall', 'Target net/Mask', 'Gateway', 'Interface'], routeRows)
+    : '<p class="muted">No routes found.</p>';
+
+  h += `<h2>Accessrules for ${ip} to other systems</h2>`;
+  const toOthers = accessRulesFor(data, ip, 'source');
+  h += toOthers.length ? accessRulesTable(toOthers)
+                        : '<p class="muted">No access rules found with this address as source.</p>';
+
+  h += `<h2>Accessrules for ${ip} from other systems</h2>`;
+  const fromOthers = accessRulesFor(data, ip, 'destination');
+  h += fromOthers.length ? accessRulesTable(fromOthers)
+                          : '<p class="muted">No access rules found with this address as destination.</p>';
+
+  return h;
 }
+
+function accessRulesTable(rules) {
+  let h = `<div class="card"><div class="card-head">Count: ${rules.length}</div><table>
+    <tr><th>Firewall Rulename</th><th>Firewall</th><th>Action</th><th>Source zone</th>
+        <th>Source</th><th>Destination zone</th><th>Destination</th><th>Service</th>
+        <th>Comment</th><th></th></tr>`;
+  rules.forEach(r => {
+    h += `<tr><td>${r.rule_id}</td><td>${r.firewall || '—'}</td>
+      <td>${r.action === 'DENY' ? '<span class="flag-red">DENY</span>' : '<span class="flag-green">ALLOW</span>'}</td>
+      <td>${zoneChip(r.source_zone)}</td><td>${truncate(r.source, 120)}</td>
+      <td>${zoneChip(r.destination_zone)}</td><td>${truncate(r.destination, 120)}</td>
+      <td>${r.service}</td><td>${r.comment || ''}</td><td>${tierBadge(r.tier)}</td></tr>`;
+  });
+  return h + '</table></div>';
+}
+function truncate(s, n) { s = String(s); return s.length > n ? s.slice(0, n) + '…' : s; }
+
+function table(headers, rows) {
+  let h = '<div class="card"><table><tr>' + headers.map(x => `<th>${x}</th>`).join('') + '</tr>';
+  rows.forEach(r => { h += '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>'; });
+  return h + '</table></div>';
+}
+
+// ── grammar-query mode (src:/dst:/serv:/action:/fw:, and/or/not, parens) ──
+function buildIndex() {
+  const idx = [];
+  allHosts(data).forEach(h => idx.push({
+    kind: 'Host', name: h.ip, src: h.ip, dst: h.ip, serv: '', action: '', fw: '',
+    text: `${h.ip} ${h.app || ''} ${h.zone} ${h.env} ${h.name || ''}`.toLowerCase(),
+    detail: `${h.app || h.name || ''} · zone ${h.zone} · env ${h.env}`, tier: h.tier,
+  }));
+  allRules(data).forEach(r => idx.push({
+    kind: 'Rule', name: r.rule_id, src: r.source, dst: r.destination, serv: r.service,
+    action: r.action, fw: r.firewall,
+    text: `${r.rule_id} ${r.source} ${r.destination} ${r.service} ${r.action} ${r.firewall} ${r.comment}`.toLowerCase(),
+    detail: `${r.action} ${truncate(r.source, 60)} → ${truncate(r.destination, 60)} (${r.service}) on ${r.firewall}`,
+    tier: r.tier,
+  }));
+  allGroups(data).forEach(g => idx.push({
+    kind: 'Group', name: g.name, src: (g.members || []).join(' '), dst: (g.members || []).join(' '),
+    serv: '', action: '', fw: '',
+    text: `${g.name} ${(g.members || []).join(' ')} ${g.comment || ''}`.toLowerCase(),
+    detail: `${(g.members || []).length} member(s) — ${g.comment || ''}`, tier: g.tier,
+  }));
+  return idx;
+}
+
+function renderGrammarSearch(raw) {
+  let matches;
+  try { matches = evalExpr(parse(tokenize(raw)), buildIndex()); }
+  catch (e) { return `<div class="info-box warn">Could not parse query: ${e.message}</div>`; }
+  if (!matches.length) return '<p class="muted">No matches.</p>';
+  let h = `<div class="card"><div class="card-head">Results (${matches.length})</div><table>
+           <tr><th>Type</th><th>Name</th><th>Detail</th><th></th></tr>`;
+  matches.slice(0, 300).forEach(m => {
+    h += `<tr><td>${m.kind}</td><td>${m.name}</td><td>${m.detail}</td><td>${tierBadge(m.tier)}</td></tr>`;
+  });
+  if (matches.length > 300) h += `<tr><td colspan="4" class="muted">…and ${matches.length - 300} more (refine the query)</td></tr>`;
+  return h + '</table></div>';
+}
+
+function tokenize(s) { return s.match(/\(|\)|\||!|\band\b|\bor\b|&|[^\s()|!&]+/gi) || []; }
 function parse(tokens) {
   let i = 0;
   function peek() { return tokens[i]; }
   function next() { return tokens[i++]; }
   function parseExpr() {
-    let node = parseTerm();
-    while (peek() && /^(or|\|)$/i.test(peek())) { next(); node = {op: 'or', a: node, b: parseTerm()}; }
-    return node;
+    let n = parseTerm();
+    while (peek() && /^(or|\|)$/i.test(peek())) { next(); n = { op: 'or', a: n, b: parseTerm() }; }
+    return n;
   }
   function parseTerm() {
-    let node = parseFactor();
+    let n = parseFactor();
     while (peek() && !/^(or|\||\))$/i.test(peek())) {
       if (/^(and|&)$/i.test(peek())) next();
-      node = {op: 'and', a: node, b: parseFactor()};
+      n = { op: 'and', a: n, b: parseFactor() };
     }
-    return node;
+    return n;
   }
   function parseFactor() {
-    if (peek() === '!') { next(); return {op: 'not', a: parseFactor()}; }
-    if (peek() === '(') { next(); const n = parseExpr();
-      if (peek() !== ')') throw new Error('missing )'); next(); return n; }
+    if (peek() === '!') { next(); return { op: 'not', a: parseFactor() }; }
+    if (peek() === '(') { next(); const n = parseExpr(); if (peek() !== ')') throw new Error('missing )'); next(); return n; }
     const tok = next();
     if (tok === undefined) throw new Error('unexpected end of query');
     const m = tok.match(/^(src|dst|serv|action|fw):(.+)$/i);
-    if (m) return {op: 'obj', spec: m[1].toLowerCase(), val: m[2].toLowerCase()};
-    return {op: 'obj', spec: null, val: tok.toLowerCase()};
+    if (m) return { op: 'obj', spec: m[1].toLowerCase(), val: m[2].toLowerCase() };
+    return { op: 'obj', spec: null, val: tok.toLowerCase() };
   }
   return parseExpr();
 }
-function evalExpr(node) {
+function evalExpr(node, idx) {
   if (node.op === 'obj') {
-    return index.filter(o => node.spec
-      ? String(o[node.spec] || '').toLowerCase().includes(node.val)
-      : o.text.includes(node.val));
+    return idx.filter(o => node.spec ? String(o[node.spec] || '').toLowerCase().includes(node.val)
+                                      : o.text.includes(node.val));
   }
-  if (node.op === 'and') { const a = evalExpr(node.a), b = new Set(evalExpr(node.b).map(x=>x.name+x.kind));
-    return a.filter(x => b.has(x.name+x.kind)); }
-  if (node.op === 'or') { const a = evalExpr(node.a), b = evalExpr(node.b);
+  if (node.op === 'and') {
+    const a = evalExpr(node.a, idx), b = new Set(evalExpr(node.b, idx).map(x => x.name + x.kind));
+    return a.filter(x => b.has(x.name + x.kind));
+  }
+  if (node.op === 'or') {
+    const a = evalExpr(node.a, idx), b = evalExpr(node.b, idx);
     const seen = new Set(); const out = [];
-    [...a, ...b].forEach(x => { const k = x.name+x.kind; if (!seen.has(k)) { seen.add(k); out.push(x); } });
-    return out; }
-  if (node.op === 'not') { const ex = new Set(evalExpr(node.a).map(x=>x.name+x.kind));
-    return index.filter(x => !ex.has(x.name+x.kind)); }
+    [...a, ...b].forEach(x => { const k = x.name + x.kind; if (!seen.has(k)) { seen.add(k); out.push(x); } });
+    return out;
+  }
+  if (node.op === 'not') {
+    const ex = new Set(evalExpr(node.a, idx).map(x => x.name + x.kind));
+    return idx.filter(x => !ex.has(x.name + x.kind));
+  }
   return [];
 }
 </script>

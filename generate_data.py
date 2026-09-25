@@ -41,6 +41,25 @@ def svc_label(svc_list):
 def build():
     reg, inv, groups, flows = estate()
 
+    # core-derived /24 networks, so CIDR-containment lookup works for core IPs too, not just
+    # exact host matches (dedup by /24 — several core hosts share one /24)
+    import ipaddress as _ip
+    seen_cidrs = {}
+    for ip, h in inv.items():
+        try:
+            net24 = str(_ip.ip_network(f"{ip}/24", strict=False))
+        except ValueError:
+            continue  # skip IPv6 fixture entries here — extended layer is v4-only anyway
+        if net24 not in seen_cidrs:
+            seen_cidrs[net24] = {"cidr": net24, "name": f"DCN-{h.app}-{h.env}-CORE",
+                                  "zone": h.zone, "env": h.env, "category": h.zone,
+                                  "firewall": "", "interface": "", "comment": "",
+                                  "tier": "core", "level": "subnet"}
+    core_networks = list(seen_cidrs.values())
+    cidrs_by_zone = {}
+    for n in core_networks:
+        cidrs_by_zone.setdefault(n["zone"], []).append(n["cidr"])
+
     hosts = []
     for ip, h in sorted(inv.items()):
         hosts.append({
@@ -99,29 +118,31 @@ def build():
         ],
     }
 
-    # Interfaces/zones per device — one illustrative device wired to real hosts (fwb-ahm1),
-    # the rest lightly stubbed so every device page still renders something.
-    interfaces = {
-        "fwb-ahm1": [
-            {"iface": "Mgmt", "subnet": "10.99.0.0/24", "zone": "MGMT",
-             "description": "DCN-MGMT-01", "responsible": "n.schmidt@btnl-demo.local", "comment": "#100010"},
-            {"iface": "bond1.410", "subnet": "10.50.1.0/24", "zone": "DMZ",
-             "description": "DCN-DMZ-01", "responsible": "r.sharma@btnl-demo.local", "comment": "#100011"},
-            {"iface": "bond1.797", "subnet": "10.20.1.0/24", "zone": "APP",
-             "description": "DCN-APP-01", "responsible": "r.sharma@btnl-demo.local", "comment": "#100012"},
-            {"iface": "bond1.780", "subnet": "10.30.1.0/24", "zone": "DB",
-             "description": "DCN-DB-01", "responsible": "m.weber@btnl-demo.local", "comment": "#100013"},
-        ],
-    }
-
-    routing = {
-        "fwb-ahm1": [
-            {"destination": "10.20.1.0/24", "gateway": "direct", "interface": "bond1.797"},
-            {"destination": "10.30.1.0/24", "gateway": "direct", "interface": "bond1.780"},
-            {"destination": "10.99.0.0/24", "gateway": "direct", "interface": "mgmt0"},
-            {"destination": "0.0.0.0/0", "gateway": "10.50.1.1", "interface": "bond1.410"},
-        ],
-    }
+    # Interfaces/zones + routing for EVERY device — built from cidrs_by_zone (computed above
+    # from the real inv), not hand-authored per device, so no device is left with "no data".
+    RESPONSIBLE = ["n.schmidt@btnl-demo.local", "r.sharma@btnl-demo.local", "m.weber@btnl-demo.local"]
+    interfaces, routing = {}, {}
+    for cat, devices in firewalls.items():
+        for idx, dev in enumerate(devices):
+            fw_id = dev["id"]
+            ifaces = [{"iface": "Mgmt", "subnet": "10.99.0.0/24", "zone": "MGMT",
+                       "description": f"DCN-MGMT-{fw_id}", "responsible": RESPONSIBLE[idx % 3],
+                       "comment": f"#{100010 + idx}"}]
+            routes = [{"destination": "10.99.0.0/24", "gateway": "direct", "interface": "mgmt0"}]
+            vlan = 400
+            for zone in dev["zones"]:
+                if zone == "MGMT":
+                    continue  # already added as the base Mgmt interface above
+                for cidr in cidrs_by_zone.get(zone, [])[:2]:
+                    vlan += 1
+                    iface_name = f"bond1.{vlan}"
+                    ifaces.append({"iface": iface_name, "subnet": cidr, "zone": zone,
+                                    "description": f"DCN-{zone}-{fw_id}",
+                                    "responsible": RESPONSIBLE[idx % 3], "comment": f"#{100010 + vlan}"})
+                    routes.append({"destination": cidr, "gateway": "direct", "interface": iface_name})
+            routes.append({"destination": "0.0.0.0/0", "gateway": "10.99.0.1", "interface": "bond1.410"})
+            interfaces[fw_id] = ifaces
+            routing[fw_id] = routes
 
     # Zone-classification wizard — same Yes/No tree as the screenshots (independent of the
     # engine's enforcement-zone enum; this classifies a NEW system before it gets one).
@@ -166,6 +187,7 @@ def build():
     )
 
     return {
+        "networks": core_networks,
         "hosts": hosts, "rules": rules, "objectgroups": objectgroups,
         "firewalls": firewalls, "interfaces": interfaces, "routing": routing,
         "zone_wizard": zone_wizard, "search_grammar": search_grammar,

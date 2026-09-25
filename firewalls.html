@@ -20,13 +20,24 @@
 
 <main>
   <h1>Firewalls</h1>
+  <p class="muted" id="totals"></p>
   <div id="groups"></div>
 </main>
 
+<script src="common.js"></script>
 <script>
 fetch('data.json').then(r => r.json()).then(d => {
+  const all = d.firewalls_all || d.firewalls;
+  const total = Object.values(all).reduce((n, arr) => n + arr.length, 0);
+  document.getElementById('totals').textContent =
+    `${total} firewalls across ${Object.keys(all).length} categories — ` +
+    `${(d.hosts||[]).length + (d.big_hosts||[]).length} hosts, ` +
+    `${(d.rules||[]).length + (d.big_rules||[]).length} access rules documented.`;
   const root = document.getElementById('groups');
-  for (const [group, devices] of Object.entries(d.firewalls)) {
+  const order = ['DC', 'DMZ', 'Cloud', 'AWS', 'Azure', 'OLD'];
+  for (const group of order) {
+    const devices = all[group];
+    if (!devices || !devices.length) continue;
     const card = document.createElement('div');
     card.className = 'card';
     const head = document.createElement('div');
@@ -38,8 +49,7 @@ fetch('data.json').then(r => r.json()).then(d => {
     table.innerHTML = '<tr><th>Firewall</th><th>Rules</th><th>Zones</th><th>Configuration</th></tr>';
     devices.forEach(dev => {
       const tr = document.createElement('tr');
-      const zoneChips = dev.zones.map(z =>
-        `<span class="zone-chip" style="background:${zoneColor(z)}">${z}</span>`).join(' ');
+      const zoneChips = (dev.zones || []).map(zoneChip).join(' ');
       tr.innerHTML = `
         <td><a href="firewall-detail.html?id=${dev.id}">${dev.id}</a></td>
         <td>${dev.rules}</td>
@@ -54,11 +64,6 @@ fetch('data.json').then(r => r.json()).then(d => {
     root.appendChild(card);
   }
 });
-
-function zoneColor(z) {
-  const m = {MGMT:'#c9c9c9', DMZ:'#7fe6e6', WEB:'#7fe6e6', APP:'#9fe08a', DB:'#3fae4a', CORE:'#3fae4a'};
-  return m[z] || '#eeeeee';
-}
 </script>
 </body>
 </html>

@@ -20,15 +20,20 @@
 
 <main style="max-width:620px;">
   <h1>Request Checker</h1>
-  <div class="info-box">
-    In the real portal this is a lightweight pre-check. In this project the equivalent — and much
-    more — is the <b>Sentrywall agent</b>: upload the Firewall-Request Excel template, run
-    Button ① (template/format check) and Button ② (full deterministic + AI-verified impact
-    analysis), and get a 🟢/🟠/🔴/⚪ flag with findings, proofs and a verification checklist.
+  <div class="info-box important">
+    <b>No upload here.</b> This documentation site never accepts an <code>fw_template.xlsx</code>
+    upload — that happens on a separate site, at a different URL.
   </div>
-  <p class="muted">This documentation clone deliberately does not re-implement that logic — it's the
-  reference data source and demo backdrop, not the assessment engine. See the Sentrywall app for
-  the actual Request Checker.</p>
+  <div class="info-box">
+    The real checking happens on <b>FRVA — FW Rule Verification Agent</b> (separate app, separate
+    URL, with its own chat section): upload the Firewall-Request Excel template there, get the
+    fill-up/format verification (Button ①), then the full FW rule-change verification (Button ②) —
+    deterministic engine + AI-verified impact analysis — and a 🟢/🟠/🔴/⚪ flag with findings,
+    proofs, a verification checklist and a downloadable analysis report (PDF/JSON).
+  </div>
+  <p class="muted">FRVA reads this documentation site as its data source for temporary RAG and
+  analysis — it does not duplicate this register, it looks it up here at run time. This site stays
+  read-only: existing FW rules only, nothing uploaded to it, ever.</p>
 </main>
 </body>
 </html>

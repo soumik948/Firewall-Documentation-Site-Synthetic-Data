@@ -97,6 +97,10 @@ tr:hover td { background: #eef3fb; }
   font-weight: 600;
   color: #10331a;
 }
+.tier-badge { display:inline-block; padding:0 6px; border-radius:3px; font-size:10px; font-weight:700;
+              text-transform:uppercase; letter-spacing:.03em; }
+.tier-core { background:#dcebff; color:#0b3d91; border:1px solid #9dc0f2; }
+.tier-extended { background:#f1eefc; color:#4a2ea8; border:1px solid #cabdf2; }
 
 .tag { display:inline-block; background:#eef1f5; border:1px solid var(--border); border-radius:3px;
        padding:0 5px; font-size:11px; margin-right:3px; }

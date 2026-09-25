@@ -29,6 +29,7 @@
   <div id="panel"></div>
 </main>
 
+<script src="common.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const fwId = params.get('id') || 'fwb-ahm1';
@@ -50,46 +51,44 @@ document.querySelectorAll('[data-tab]').forEach(a => {
   });
 });
 
-function zoneChip(z) {
-  const m = {MGMT:'#c9c9c9', DMZ:'#7fe6e6', WEB:'#7fe6e6', APP:'#9fe08a', DB:'#3fae4a', CORE:'#3fae4a'};
-  return z ? `<span class="zone-chip" style="background:${m[z]||'#eee'}">${z}</span>` : '';
-}
-
 function render() {
   const d = window.__data;
   const panel = document.getElementById('panel');
+  const ifaceRows = (d.interfaces && d.interfaces[fwId]) || (d.big_interfaces && d.big_interfaces[fwId]) || [];
+  const routeRows = (d.routing && d.routing[fwId]) || (d.big_routing && d.big_routing[fwId]) || [];
+
   if (activeTab === 'iface') {
-    const rows = (d.interfaces[fwId] || []);
     panel.innerHTML = table(
       ['Interface','Subnet','Netzone','Description','Responsible','Comment'],
-      rows.length ? rows.map(r => [r.iface, r.subnet, zoneChip(r.zone), r.description, r.responsible, r.comment])
-                  : [['—','no interfaces recorded for this synthetic device — showing example device only','','','','']]
+      ifaceRows.length ? ifaceRows.map(r => [r.iface, r.subnet, zoneChip(r.zone), r.description, r.responsible, r.comment])
+                        : [['—','no interfaces recorded for this device','','','','']]
     );
   } else if (activeTab === 'groups') {
+    const groups = allGroups(d);
     panel.innerHTML = table(
-      ['Name','Members','Comment'],
-      d.objectgroups.map(g => [g.name, g.members.join('<br>') || '<i>empty</i>', g.comment])
+      ['Name','Members','Comment',''],
+      groups.slice(0, 200).map(g => [g.name, truncate((g.members||[]).join(', '), 200) || '<i>empty</i>', g.comment || '', tierBadge(g.tier)])
     );
   } else if (activeTab === 'routing') {
-    const rows = (d.routing[fwId] || []);
     panel.innerHTML = table(
       ['Destination','Gateway','Interface'],
-      rows.length ? rows.map(r => [r.destination, r.gateway, r.interface])
-                  : [['—','no routing entries recorded for this synthetic device','']]
+      routeRows.length ? routeRows.map(r => [r.destination, r.gateway, r.interface])
+                        : [['—','no routing entries recorded for this device','']]
     );
   } else if (activeTab === 'rules') {
-    panel.innerHTML = table(
-      ['Rulename','Action','Source zone','Source','Destination zone','Destination','Service','Comment'],
-      d.rules.map(r => [r.rule_id, flagAction(r.action), zoneChip(r.source_zone), r.source,
-                         zoneChip(r.destination_zone), r.destination, r.service, r.comment])
-    );
+    const rules = allRules(d).filter(r => r.firewall === fwId);
+    panel.innerHTML = rules.length ? table(
+      ['Rulename','Action','Source zone','Source','Destination zone','Destination','Service','Comment',''],
+      rules.map(r => [r.rule_id, flagAction(r.action), zoneChip(r.source_zone), truncate(r.source, 150),
+                       zoneChip(r.destination_zone), truncate(r.destination, 150), r.service, r.comment, tierBadge(r.tier)])
+    ) : '<p class="muted">No access rules are assigned to this specific firewall in the synthetic dataset.</p>';
   }
 }
 
+function truncate(s, n) { s = String(s); return s.length > n ? s.slice(0, n) + '…' : s; }
 function flagAction(a) {
   return a === 'DENY' ? '<span class="flag-red">DENY</span>' : '<span class="flag-green">ALLOW</span>';
 }
-
 function table(headers, rows) {
   let h = '<div class="card"><table><tr>' + headers.map(x => `<th>${x}</th>`).join('') + '</tr>';
   rows.forEach(r => { h += '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>'; });

@@ -23,12 +23,19 @@
 
   <div class="info-box">
     This is a look-alike clone of the internal Firewall Documentation System, rebuilt with 100%
-    synthetic data for the Sentrywall proof-of-concept. It mirrors the navigation and feature set —
+    synthetic data. It mirrors the navigation and feature set —
     <b>Firewalls</b>, <b>Zone App</b> (system classification wizard), <b>Search</b> (query grammar) —
     of the real portal shown in the source screenshots.
   </div>
+  <div class="info-box important">
+    <b>Read-only, existing rules only.</b> Nothing is ever uploaded here. Firewall-change requests
+    (<code>fw_template.xlsx</code>) go to a separate site — <b>FRVA (FW Rule Verification Agent)</b>,
+    a different URL with its own chat section — which reads this site as its temporary-RAG data
+    source and posts its verdict, analysis and report there, not here.
+  </div>
 
   <h2>What's in this demo</h2>
+  <p class="muted" id="stats">Loading…</p>
   <table>
     <tr><th>Section</th><th>What it shows</th></tr>
     <tr><td><a href="firewalls.html">Firewalls</a></td>
@@ -41,8 +48,8 @@
         <td>The same query grammar (<code>src:</code> / <code>dst:</code> / <code>serv:</code> /
         <code>action:</code> / <code>fw:</code>) over the synthetic host/rule/group dataset.</td></tr>
     <tr><td><a href="request-checker.html">Request Checker</a></td>
-        <td>Points to the actual Sentrywall agent app — this documentation clone does not run
-        analysis itself.</td></tr>
+        <td>Points to FRVA (FW Rule Verification Agent) — the separate app, separate URL, where
+        <code>fw_template.xlsx</code> is actually uploaded and verified. Not here.</td></tr>
   </table>
 
   <p class="footnote" id="source-note">Loading data source note…</p>
@@ -51,6 +58,12 @@
 <script>
 fetch('data.json').then(r => r.json()).then(d => {
   document.getElementById('source-note').textContent = d.source_note;
+  const nFw = Object.values(d.firewalls_all || d.firewalls).reduce((n, a) => n + a.length, 0);
+  document.getElementById('stats').textContent =
+    `${nFw} firewalls · ${(d.hosts||[]).length + (d.big_hosts||[]).length} hosts · ` +
+    `${(d.networks||[]).length} networks · ${(d.rules||[]).length + (d.big_rules||[]).length} access rules · ` +
+    `${(d.objectgroups||[]).length + (d.big_groups||[]).length} groups — spanning 16 synthetic ` +
+    `regions (WEB/APP/MW/DB/CNF/DMZ/MGMT/SVC/DR/CLOUD/EXT, PROD/TEST/DEV/DR).`;
 });
 </script>
 </body>
